@@ -1,6 +1,11 @@
 import tensorflow as tf
+import time
 
-a = tf.constant([[1, 2], [3, 4]])
-b = tf.constant([[5, 6], [7, 8]])
-c = tf.matmul(a, b)
-print(c)
+n = 10000
+t1 = time.time()
+with tf.device("gpu:0"):
+    a = tf.random.uniform(shape=(n, n))
+    b = tf.random.uniform(shape=(n, n))
+    c = tf.matmul(a, b)
+t2 = time.time()
+print(t2 - t1)
