@@ -1,6 +1,5 @@
 import tensorflow as tf
 import time
-import numpy as np
 
 
 class MNISTLoader():
@@ -31,4 +30,77 @@ class MNISTLoader():
         return tf.gather(params=self.x_train, indices=index), tf.gather(params=self.y_train, indices=index)
 
 
-loader: MNISTLoader = MNISTLoader()
+class CNN(tf.keras.Model):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters=1,
+            kernel_size=[3, 3],
+            padding='valid',
+            strides=(2, 2),
+            activation=tf.nn.relu
+        )
+        self.conv2 = tf.keras.layers.Conv2D(
+            filters=1,
+            kernel_size=[3, 3],
+            padding='valid',
+            strides=(2, 2),
+            activation=tf.nn.relu
+        )
+        self.conv3 = tf.keras.layers.Conv2D(
+            filters=1,
+            kernel_size=[3, 3],
+            padding='same',
+            strides=(2, 2),
+            activation=tf.nn.relu
+        )
+        self.conv4 = tf.keras.layers.Conv2D(
+            filters=10,
+            kernel_size=[3, 3],
+            padding='valid',
+            strides=(1, 1)
+        )
+        self.flatten = tf.keras.layers.Reshape(target_shape=(10,))
+
+    def call(self, inputs, training=None, mask=None):
+        outputs = self.conv1(inputs)
+        outputs = self.conv2(outputs)
+        outputs = self.conv3(outputs)
+        outputs = self.conv4(outputs)
+        outputs = self.flatten(outputs)
+        outputs = tf.nn.softmax(outputs)
+        return outputs
+
+
+epoch = 3
+batch_size = 64
+learning_rate = 1e-3
+
+loader = MNISTLoader()
+model = CNN()
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+batch_num = int(loader.train_num / batch_size)
+show_num = 100
+
+sparse_categorical_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
+
+for e in range(epoch):
+    t1 = time.time()
+    print('epoch:', e)
+    for batch in range(batch_num):
+        x, y = loader.get_batch(batch_size=batch_size)
+        with tf.GradientTape() as tape:
+            y_pred = model(x)
+            loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=y, y_pred=y_pred)
+            loss = tf.reduce_mean(loss)
+        if 0 == (batch + 1) % show_num:
+            print('batch:', batch + 1, '\tloss:', loss.numpy())
+        grads = tape.gradient(loss, model.variables)
+        optimizer.apply_gradients(grads_and_vars=zip(grads, model.variables))
+    t2 = time.time()
+    print('training time:', t2 - t1)
+    print('testing...')
+    y_pred = model.predict(x=loader.x_test, batch_size=batch_size)
+    sparse_categorical_accuracy.update_state(y_true=loader.y_test, y_pred=y_pred)
+    print('test accuracy:', sparse_categorical_accuracy.result().numpy())
