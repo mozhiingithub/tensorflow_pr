@@ -1,6 +1,8 @@
 import tensorflow as tf
 import time
 
+filter_num = 6
+
 
 class MNISTLoader():
     def __init__(self):
@@ -34,21 +36,21 @@ class CNN(tf.keras.Model):
     def __init__(self):
         super().__init__()
         self.conv1 = tf.keras.layers.Conv2D(
-            filters=1,
+            filters=filter_num,
             kernel_size=[3, 3],
             padding='valid',
             strides=(2, 2),
             activation=tf.nn.relu
         )
         self.conv2 = tf.keras.layers.Conv2D(
-            filters=1,
+            filters=filter_num,
             kernel_size=[3, 3],
             padding='valid',
             strides=(2, 2),
             activation=tf.nn.relu
         )
         self.conv3 = tf.keras.layers.Conv2D(
-            filters=1,
+            filters=filter_num,
             kernel_size=[3, 3],
             padding='same',
             strides=(2, 2),
@@ -72,8 +74,8 @@ class CNN(tf.keras.Model):
         return outputs
 
 
-epoch = 3
-batch_size = 64
+epoch = 200
+batch_size = 32
 learning_rate = 1e-3
 
 loader = MNISTLoader()
@@ -81,7 +83,7 @@ model = CNN()
 optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
 batch_num = int(loader.train_num / batch_size)
-show_num = 100
+show_num = 1000
 
 sparse_categorical_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
 
@@ -89,7 +91,11 @@ for e in range(epoch):
     t1 = time.time()
     print('epoch:', e)
     for batch in range(batch_num):
-        x, y = loader.get_batch(batch_size=batch_size)
+        # x, y = loader.get_batch(batch_size=batch_size)
+        start = batch * batch_size
+        end = (batch + 1) * batch_size
+        x = loader.x_train[start:end]
+        y = loader.y_train[start:end]
         with tf.GradientTape() as tape:
             y_pred = model(x)
             loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=y, y_pred=y_pred)
@@ -99,8 +105,8 @@ for e in range(epoch):
         grads = tape.gradient(loss, model.variables)
         optimizer.apply_gradients(grads_and_vars=zip(grads, model.variables))
     t2 = time.time()
-    print('training time:', t2 - t1)
-    print('testing...')
+    # print('training time:', t2 - t1)
+    # print('testing...')
     y_pred = model.predict(x=loader.x_test, batch_size=batch_size)
     sparse_categorical_accuracy.update_state(y_true=loader.y_test, y_pred=y_pred)
     print('test accuracy:', sparse_categorical_accuracy.result().numpy())
