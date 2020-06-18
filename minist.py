@@ -72,6 +72,92 @@ class MyCNN(tf.keras.Model):
         return outputs
 
 
+class MyCNN2(tf.keras.Model):
+    def __init__(self, filters_size):
+        super().__init__()
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters=filters_size[0],
+            kernel_size=[3, 3],
+            padding='same',
+            activation=tf.nn.relu
+        )
+        self.pool1 = tf.keras.layers.MaxPool2D(strides=2)
+        self.conv2 = tf.keras.layers.Conv2D(
+            filters=filters_size[1],
+            kernel_size=[3, 3],
+            padding='same',
+            activation=tf.nn.relu
+        )
+        self.pool2 = tf.keras.layers.MaxPool2D(strides=2)
+        self.conv3 = tf.keras.layers.Conv2D(
+            filters=filters_size[2],
+            kernel_size=[3, 3],
+            padding='same',
+            activation=tf.nn.relu
+        )
+        self.pool3 = tf.keras.layers.MaxPool2D(strides=2)
+        self.conv4 = tf.keras.layers.Conv2D(
+            filters=10,
+            kernel_size=[3, 3],
+            padding='valid'
+        )
+        self.flatten = tf.keras.layers.Reshape(target_shape=(10,))
+
+    def call(self, inputs, training=None, mask=None):
+        outputs = self.conv1(inputs)
+        outputs = self.pool1(outputs)
+        outputs = self.conv2(outputs)
+        outputs = self.pool2(outputs)
+        outputs = self.conv3(outputs)
+        outputs = self.pool3(outputs)
+        outputs = self.conv4(outputs)
+        outputs = self.flatten(outputs)
+        outputs = tf.nn.softmax(outputs)
+        return outputs
+
+
+class MyCNN3(tf.keras.Model):
+    def __init__(self, filters_size):
+        super().__init__()
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters=filters_size[0],
+            kernel_size=[3, 3],
+            padding='same',
+            strides=(2, 2),
+            activation=tf.nn.relu,
+        )
+        self.conv2 = tf.keras.layers.Conv2D(
+            filters=filters_size[1],
+            kernel_size=[3, 3],
+            padding='same',
+            strides=(2, 2),
+            activation=tf.nn.relu,
+        )
+        self.conv3 = tf.keras.layers.Conv2D(
+            filters=filters_size[2],
+            kernel_size=[3, 3],
+            padding='valid',
+            strides=(2, 2),
+            activation=tf.nn.relu,
+        )
+        self.conv4 = tf.keras.layers.Conv2D(
+            filters=10,
+            kernel_size=[3, 3],
+            padding='valid',
+            strides=(1, 1),
+        )
+        self.flatten = tf.keras.layers.Reshape(target_shape=(10,))
+
+    def call(self, inputs, training=None, mask=None):
+        outputs = self.conv1(inputs)
+        outputs = self.conv2(outputs)
+        outputs = self.conv3(outputs)
+        outputs = self.conv4(outputs)
+        outputs = self.flatten(outputs)
+        outputs = tf.nn.softmax(outputs)
+        return outputs
+
+
 class MLP(tf.keras.Model):
     def __init__(self):
         super().__init__()
@@ -122,10 +208,12 @@ class CNN(tf.keras.Model):
 
 loader = MNISTLoader()
 
-# filters_size_ = [8, 64, 128]
+filters_size_ = [32, 64, 128]
 # model = MyCNN(filters_size=filters_size_)
+# model = MyCNN2(filters_size=filters_size_)
+model = MyCNN3(filters_size=filters_size_)
 
-model = CNN()
+# model = CNN()
 
 # model = MLP()
 
