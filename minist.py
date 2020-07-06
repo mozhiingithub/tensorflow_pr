@@ -2,6 +2,7 @@ import tensorflow as tf
 import time
 
 
+# mnist数据集加载器
 class MNISTLoader:
     def __init__(self):
         mnist = tf.keras.datasets.mnist  # 获取数据集
@@ -12,7 +13,7 @@ class MNISTLoader:
         self.x_train: tf.Tensor = tf.expand_dims(input=self.x_train, axis=-1)  # 升维以构建一个颜色通道
 
         self.x_test = tf.constant(value=self.x_test, dtype=tf.float32)
-        self.x_train /= 255
+        self.x_test /= 255
         self.x_test: tf.Tensor = tf.expand_dims(input=self.x_test, axis=-1)
 
         self.y_train: tf.Tensor = tf.constant(value=self.y_train, dtype=tf.int32)
@@ -21,7 +22,9 @@ class MNISTLoader:
         self.train_num: int = self.x_train.shape[0]
         self.test_num: int = self.x_test.shape[0]
 
+    # 获取一个批次的训练数据
     def get_batch(self, batch_size_: int):
+        # 随机生成训练数据的序号集
         index: tf.Tensor = tf.random.uniform(
             shape=(batch_size_,),
             maxval=self.train_num,
@@ -30,16 +33,22 @@ class MNISTLoader:
         return tf.gather(params=self.x_train, indices=index), tf.gather(params=self.y_train, indices=index)
 
 
+# 自定义CNN模型结构
 class MyCNN(tf.keras.Model):
     def __init__(self, filters_size):
         super().__init__()
+        # 输入层规格为28*28*1
+
+        # 第一层卷积，输出规格为13*13*filters_size[0]
         self.conv1 = tf.keras.layers.Conv2D(
             filters=filters_size[0],
             kernel_size=[3, 3],
             padding='valid',
             strides=(2, 2),
-            activation=tf.nn.relu,
+            activation=tf.nn.relu
         )
+
+        # 第二层卷积，输出规格为6*6*filters_size[1]
         self.conv2 = tf.keras.layers.Conv2D(
             filters=filters_size[1],
             kernel_size=[3, 3],
@@ -47,6 +56,8 @@ class MyCNN(tf.keras.Model):
             strides=(2, 2),
             activation=tf.nn.relu,
         )
+
+        # 第三层卷积，输出规格为3*3*filters_size[2]
         self.conv3 = tf.keras.layers.Conv2D(
             filters=filters_size[2],
             kernel_size=[3, 3],
@@ -54,14 +65,19 @@ class MyCNN(tf.keras.Model):
             strides=(2, 2),
             activation=tf.nn.relu,
         )
+
+        # 第四层卷积，输出规格为1*1*10
         self.conv4 = tf.keras.layers.Conv2D(
             filters=10,
             kernel_size=[3, 3],
             padding='valid',
             strides=(1, 1),
         )
+
+        # 将1*1*10的张量展成10*1
         self.flatten = tf.keras.layers.Reshape(target_shape=(10,))
 
+    # 前向传播
     def call(self, inputs, training=None, mask=None):
         outputs = self.conv1(inputs)
         outputs = self.conv2(outputs)
@@ -72,225 +88,48 @@ class MyCNN(tf.keras.Model):
         return outputs
 
 
-class MyCNN2(tf.keras.Model):
-    def __init__(self, filters_size):
-        super().__init__()
-        self.conv1 = tf.keras.layers.Conv2D(
-            filters=filters_size[0],
-            kernel_size=[3, 3],
-            padding='same',
-            activation=tf.nn.relu
-        )
-        self.pool1 = tf.keras.layers.MaxPool2D(strides=2)
-        self.conv2 = tf.keras.layers.Conv2D(
-            filters=filters_size[1],
-            kernel_size=[3, 3],
-            padding='same',
-            activation=tf.nn.relu
-        )
-        self.pool2 = tf.keras.layers.MaxPool2D(strides=2)
-        self.conv3 = tf.keras.layers.Conv2D(
-            filters=filters_size[2],
-            kernel_size=[3, 3],
-            padding='same',
-            activation=tf.nn.relu
-        )
-        self.pool3 = tf.keras.layers.MaxPool2D(strides=2)
-        self.conv4 = tf.keras.layers.Conv2D(
-            filters=10,
-            kernel_size=[3, 3],
-            padding='valid'
-        )
-        self.flatten = tf.keras.layers.Reshape(target_shape=(10,))
+loader = MNISTLoader()  # 初始化数据集加载器
 
-    def call(self, inputs, training=None, mask=None):
-        outputs = self.conv1(inputs)
-        outputs = self.pool1(outputs)
-        outputs = self.conv2(outputs)
-        outputs = self.pool2(outputs)
-        outputs = self.conv3(outputs)
-        outputs = self.pool3(outputs)
-        outputs = self.conv4(outputs)
-        outputs = self.flatten(outputs)
-        outputs = tf.nn.softmax(outputs)
-        return outputs
+filters_size_ = [4, 8, 16]  # CNN模型每层卷积核个数
+model = MyCNN(filters_size=filters_size_)  # 初始化模型
 
+epoch = 100  # 训练总回合
+batch_size = 32  # 批次尺寸，即每次更新数据所用到的样本量
+not_up_count = 0  # 统计测试集准确率连续下降次数，用于过拟合时及时终止训练
+max_not_up_count = 5  # 最大测试集准确率连续下降次数
+max_acc = 0  # 最高测试集准确率标志位
+batch_num = int(loader.train_num / batch_size)  # 单次训练回合总批次数
 
-class MyCNN3(tf.keras.Model):
-    def __init__(self, filters_size):
-        super().__init__()
-        self.conv1 = tf.keras.layers.Conv2D(
-            filters=filters_size[0],
-            kernel_size=[3, 3],
-            padding='same',
-            strides=(2, 2),
-            activation=tf.nn.relu,
-        )
-        self.conv2 = tf.keras.layers.Conv2D(
-            filters=filters_size[1],
-            kernel_size=[3, 3],
-            padding='same',
-            strides=(2, 2),
-            activation=tf.nn.relu,
-        )
-        self.conv3 = tf.keras.layers.Conv2D(
-            filters=filters_size[2],
-            kernel_size=[3, 3],
-            padding='valid',
-            strides=(2, 2),
-            activation=tf.nn.relu,
-        )
-        self.conv4 = tf.keras.layers.Conv2D(
-            filters=10,
-            kernel_size=[3, 3],
-            padding='valid',
-            strides=(1, 1),
-        )
-        self.flatten = tf.keras.layers.Reshape(target_shape=(10,))
+learning_rate = 1e-3  # 学习率
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)  # 初始化优化器
 
-    def call(self, inputs, training=None, mask=None):
-        outputs = self.conv1(inputs)
-        outputs = self.conv2(outputs)
-        outputs = self.conv3(outputs)
-        outputs = self.conv4(outputs)
-        outputs = self.flatten(outputs)
-        outputs = tf.nn.softmax(outputs)
-        return outputs
-
-
-class MLP(tf.keras.Model):
-    def __init__(self):
-        super().__init__()
-        self.flatten = tf.keras.layers.Flatten()  # Flatten层将除第一维（batch_size）以外的维度展平
-        self.dense1 = tf.keras.layers.Dense(units=100, activation=tf.nn.relu)
-        self.dense2 = tf.keras.layers.Dense(units=10)
-
-    def call(self, inputs, training=None, mask=None):  # [batch_size, 28, 28, 1]
-        x = self.flatten(inputs)  # [batch_size, 784]
-        x = self.dense1(x)  # [batch_size, 100]
-        x = self.dense2(x)  # [batch_size, 10]
-        output = tf.nn.softmax(x)
-        return output
-
-
-class CNN(tf.keras.Model):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = tf.keras.layers.Conv2D(
-            filters=32,  # 卷积层神经元（卷积核）数目
-            kernel_size=[5, 5],  # 感受野大小
-            padding='same',  # padding策略（vaild 或 same）
-            activation=tf.nn.relu  # 激活函数
-        )
-        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=[2, 2], strides=2)
-        self.conv2 = tf.keras.layers.Conv2D(
-            filters=64,
-            kernel_size=[5, 5],
-            padding='same',
-            activation=tf.nn.relu
-        )
-        self.pool2 = tf.keras.layers.MaxPool2D(pool_size=[2, 2], strides=2)
-        self.flatten = tf.keras.layers.Reshape(target_shape=(7 * 7 * 64,))
-        self.dense1 = tf.keras.layers.Dense(units=1024, activation=tf.nn.relu)
-        self.dense2 = tf.keras.layers.Dense(units=10)
-
-    def call(self, inputs, training=None, mask=None):
-        x = self.conv1(inputs)  # [batch_size, 28, 28, 32]
-        x = self.pool1(x)  # [batch_size, 14, 14, 32]
-        x = self.conv2(x)  # [batch_size, 14, 14, 64]
-        x = self.pool2(x)  # [batch_size, 7, 7, 64]
-        x = self.flatten(x)  # [batch_size, 7 * 7 * 64]
-        x = self.dense1(x)  # [batch_size, 1024]
-        x = self.dense2(x)  # [batch_size, 10]
-        output = tf.nn.softmax(x)
-        return output
-
-
-loader = MNISTLoader()
-
-filters_size_ = [32, 64, 128]
-# model = MyCNN(filters_size=filters_size_)
-# model = MyCNN2(filters_size=filters_size_)
-model = MyCNN3(filters_size=filters_size_)
-
-# model = CNN()
-
-# model = MLP()
-
-epoch = 100
-pause_epoch = -1
-batch_size = 32
-# show_num = 1000
-not_up_count = 0
-max_not_up_count = 5
-max_acc = 0
-batch_num = int(loader.train_num / batch_size)
-total_predict_time = 0
-
-learning_rate = 1e-3
-optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
-sparse_categorical_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
+sparse_categorical_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()  # 初始化测试集评估工具
 
 print('start training...')
 
-for e in range(epoch):
-    # t1 = time.time()
-    # print('epoch:', e)
-    for batch in range(batch_num):
-        x, y = loader.get_batch(batch_size_=batch_size)
-
-        # start = batch * batch_size
-        # end = (batch + 1) * batch_size
-        # x = loader.x_train[start:end]
-        # y = loader.y_train[start:end]
-
-        with tf.GradientTape() as tape:
-            y_pred = model(x)
+for e in range(epoch):  # 训练回合循环
+    for batch in range(batch_num):  # 批次循环
+        x, y = loader.get_batch(batch_size_=batch_size)  # 获取当前批次的训练样本
+        with tf.GradientTape() as tape:  # 使用tape记录计算图当中的所有运算操作
+            y_pred = model(x)  # 获取运算结果
             loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=y, y_pred=y_pred)
-            loss = tf.reduce_mean(loss)
-        # if 0 == (batch + 1) % show_num:
-        #     print('batch:', batch + 1, '\tloss:', loss.numpy())
-        grads = tape.gradient(loss, model.variables)
-        optimizer.apply_gradients(grads_and_vars=zip(grads, model.variables))
-    # t2 = time.time()
-    # print('training time:', t2 - t1)
-    # print('testing...')
-    t1 = time.time()
-    y_pred = model.predict(x=loader.x_test, batch_size=batch_size)
-    t2 = time.time()
-    total_predict_time += t2 - t1
-    sparse_categorical_accuracy.update_state(y_true=loader.y_test, y_pred=y_pred)
-    test_acc = sparse_categorical_accuracy.result().numpy()
+            loss = tf.reduce_mean(loss)  # 计算损失
+        grads = tape.gradient(loss, model.variables)  # 损失函数关于模型参数求导，获取梯度
+        optimizer.apply_gradients(grads_and_vars=zip(grads, model.variables))  # 优化器优化模型参数
+    y_pred = model.predict(x=loader.x_test, batch_size=batch_size)  # 获取测试集运算结果
+    sparse_categorical_accuracy.update_state(y_true=loader.y_test, y_pred=y_pred)  # 评估测试集准确率
+    test_acc = sparse_categorical_accuracy.result().numpy()  # 获取准确率数值
     print('epoch:', e + 1, '\ttest accuracy:', test_acc)
-    # if test_acc < min_acc:
-    #     print('re-init...')
-    #     model = CNN2(filters_size=filters_size_)
-    #     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    #     continue
 
+    # 判断当前训练回合，测试集准确率是否高于此前最值
     if test_acc > max_acc:
-        max_acc = test_acc
-        not_up_count = 0
+        max_acc = test_acc  # 更新最高准确率
+        not_up_count = 0  # 过拟合回合数清零
+        # 此处预留模型节点保存机制
     else:
-        if not_up_count <= max_not_up_count:
-            not_up_count += 1
+        if not_up_count < max_not_up_count:
+            not_up_count += 1  # 过拟合次数加1
         else:
-            pause_epoch = e + 1
-            break
+            break  # 过拟合次数已经超过上限，退出训练
 
 print('the best accuracy:', max_acc)
-
-if pause_epoch == -1:
-    pause_epoch = epoch
-
-print('mean predict time:', total_predict_time / pause_epoch)
-
-variables_num = 0
-for variable in model.variables:
-    variable_num = 1
-    for size in variable.shape:
-        variable_num *= size
-    variables_num += variable_num
-
-print('the total num of the variables:', variables_num)
