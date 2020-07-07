@@ -1,5 +1,5 @@
 import tensorflow as tf
-from minist import MNISTLoader
+from mnist import MNISTLoader
 
 model = tf.saved_model.load('./savedmodel')
 

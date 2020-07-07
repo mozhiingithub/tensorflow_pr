@@ -1,5 +1,5 @@
 import tensorflow as tf
-from minist import MyCNN, MNISTLoader
+from mnist import MyCNN, MNISTLoader
 
 save_path = './save'
 
