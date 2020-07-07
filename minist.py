@@ -91,31 +91,40 @@ class MyCNN(tf.keras.Model):
 
 loader = MNISTLoader()  # 初始化数据集加载器
 
-epoch = 1000  # 训练总回合
+epoch = 10000  # 训练总回合
 batch_size = 32  # 批次尺寸，即每次更新数据所用到的样本量
 not_up_count = 0  # 统计测试集准确率连续下降次数，用于过拟合时及时终止训练
 max_not_up_count = 5  # 最大测试集准确率连续下降次数
-max_acc = 0  # 最高测试集准确率标志位
+max_acc = tf.Variable(initial_value=0.0, dtype=tf.float32)  # 最高测试集准确率标志位
 batch_num = int(loader.train_num / batch_size)  # 单次训练回合总批次数
+save_path = './save'
 
-filters_size_ = [4, 8, 16]  # CNN模型每层卷积核个数
+filters_size_ = [2, 4, 8]  # CNN模型每层卷积核个数
 model = MyCNN(filters_size=filters_size_)  # 初始化模型
 
 learning_rate = 1e-3  # 学习率
 optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)  # 初始化优化器
 
-checkpoint = tf.train.Checkpoint(model=model, optimizer=optimizer)  # 模型及优化器参数保存节点
-manager = tf.train.CheckpointManager(checkpoint=checkpoint, directory='./save', max_to_keep=2)  # 节点保存管理器
+current_epoch = tf.Variable(initial_value=0, dtype=tf.int32)  # 当前训练回合
+
+checkpoint = tf.train.Checkpoint(model=model,
+                                 optimizer=optimizer,
+                                 current_epoch=current_epoch,
+                                 max_acc=max_acc)  # 模型及优化器参数保存节点
+manager = tf.train.CheckpointManager(checkpoint=checkpoint, directory=save_path, max_to_keep=3)  # 节点保存管理器
 
 retrain_flag = False  # 接续训练标志位
 if retrain_flag:
-    checkpoint.restore(tf.train.latest_checkpoint('./save'))
+    checkpoint.restore(tf.train.latest_checkpoint(save_path))
 
 sparse_categorical_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()  # 初始化测试集评估工具
 
+summary_writer = tf.summary.create_file_writer('./tensorboard')
+
 print('start training...')
 
-while True:  # 训练回合循环
+for e in range(current_epoch.numpy(), epoch + 1):  # 训练回合循环
+    current_epoch.assign_add(1)
     for batch in range(batch_num):  # 批次循环
         x, y = loader.get_batch(batch_size_=batch_size)  # 获取当前批次的训练样本
         with tf.GradientTape() as tape:  # 使用tape记录计算图当中的所有运算操作
@@ -126,16 +135,20 @@ while True:  # 训练回合循环
         optimizer.apply_gradients(grads_and_vars=zip(grads, model.variables))  # 优化器优化模型参数
     y_pred = model.predict(x=loader.x_test, batch_size=batch_size)  # 获取测试集运算结果
     sparse_categorical_accuracy.update_state(y_true=loader.y_test, y_pred=y_pred)  # 评估测试集准确率
-    test_acc = sparse_categorical_accuracy.result().numpy()  # 获取准确率数值
-    print(datetime.datetime.now(), 'test acc:', test_acc)
+    test_acc = sparse_categorical_accuracy.result()  # 获取准确率数值
+    print(datetime.datetime.now(), 'epoch:', current_epoch.numpy(), 'test acc:', test_acc.numpy(), end='\tsaving...\t')
 
     # 判断当前训练回合，测试集准确率是否高于此前最值
     if test_acc > max_acc:
-        max_acc = test_acc  # 更新最高准确率
+        max_acc.assign(test_acc)  # 更新最高准确率
         not_up_count = 0  # 过拟合回合数清零
         # 保存节点，节点代号为准确率百分比制式，保留小数点后两位
-        manager.save(checkpoint_number=int(test_acc * 1e4))
+        manager.save(checkpoint_number=current_epoch)
+        with summary_writer.as_default():
+            tf.summary.scalar('test_acc', test_acc.numpy(), step=current_epoch.numpy())
+        print('saved.')
     else:
+        print('not saved.')
         if not_up_count < max_not_up_count:
             not_up_count += 1  # 过拟合次数加1
         else:
